@@ -8,7 +8,7 @@ moduleinfo = {'version': '0.1',
 moduleconfig = ['api_id', 'apikey']
 misperrors = {'error': 'Error'}
 misp_types_in = ['domain', 'email-attachment', 'email-dst', 'email-reply-to', 'email-src', 'email-subject',
-                 'filename', 'hostname', 'ip', 'ip-src', 'ip-dst', 'md5', 'mutex', 'regkey', 'sha1', 'sha256', 'uri', 'url',
+                 'filename', 'hostname', 'ip-src', 'ip-dst', 'md5', 'mutex', 'regkey', 'sha1', 'sha256', 'uri', 'url',
                  'user-agent', 'whois-registrant-email', 'x509-fingerprint-md5']
 mapping_out = {  # mapping between the MISP attributes types and the compatible CrowdStrike indicator types.
     'domain': {'types': 'hostname', 'to_ids': True},

@@ -15,8 +15,9 @@ log.addHandler(ch)
 
 misperrors = {'error': 'Error'}
 mispattributes = {
-    'input': ['domain', 'email-src', 'email-dst', 'target-email', 'whois-registrant-email',
-              'whois-registrant-name', 'whois-registrant-phone', 'ip-src', 'ip-dst'],
+    'input': ['domain', 'domain|ip', 'email-src', 'email-dst', 'target-email', 'whois-registrant-email',
+              'whois-registrant-name', 'whois-registrant-phone', 'ip-src', 'ip-dst', 'hostname',
+              'hostname|port', 'ip-src|port', 'ip-dst|port'],
     'output': ['whois-registrant-email', 'whois-registrant-phone', 'whois-registrant-name',
                'whois-registrar', 'whois-creation-date', 'freetext', 'domain']
 }
@@ -31,9 +32,9 @@ moduleinfo = {
 moduleconfig = ['username', 'api_key']
 
 query_profiles = [
-    {'inputs': ['domain'], 'services': ['parsed_whois', 'domain_profile', 'reputation', 'reverse_ip']},
+    {'inputs': ['domain', 'hostname'], 'services': ['parsed_whois', 'domain_profile', 'reputation', 'reverse_ip']},
     {'inputs': ['email-src', 'email-dst', 'target-email', 'whois-registrant-email', 'whois-registrant-name', 'whois-registrant-phone'], 'services': ['reverse_whois']},
-    {'inputs': ['ip-src', 'ip-dst'], 'services': ['host_domains']}
+    {'inputs': ['ip', 'ip-src', 'ip-dst'], 'services': ['host_domains']}
 ]
 
 
@@ -223,15 +224,20 @@ def reverse_ip_whois(domtools, to_query, values):
     #    values.add_domain(d, 'Reverse domain related to {}.'.format(to_query))
     return values
 
+def get_services(type_):
+    for p in query_profiles:
+        if type_ in p['inputs']:
+            return p['services']
 
-def get_services(request):
-    for t in mispattributes['input']:
-        to_query = request.get(t)
-        if not to_query:
-            continue
-        for p in query_profiles:
-            if t in p['inputs']:
-                return p['services']
+
+def process_query(type_, domtools, to_query, values):
+    services = get_services(type_)
+    if services:
+        try:
+            for s in services:
+                globals()[s](domtools, to_query, values)
+        except Exception as e:
+            print(to_query, type(e), e)
 
 
 def handler(q=False):
@@ -243,6 +249,7 @@ def handler(q=False):
     for t in mispattributes['input']:
         to_query = request.get(t)
         if to_query:
+            input_type = t
             break
     if not to_query:
         misperrors['error'] = "Unsupported attributes type"
@@ -259,13 +266,12 @@ def handler(q=False):
         return misperrors
 
     values = DomainTools()
-    services = get_services(request)
-    if services:
-        try:
-            for s in services:
-                globals()[s](domtools, to_query, values)
-        except Exception as e:
-            print(to_query, type(e), e)
+    if '|' in input_type:
+        to_query, query = to_query.split('|')
+        input_type, type_ = input_type.split('|')
+        if type_ != 'port':
+            process_query(type_, domtools, query, values)
+    process_query(input_type, domtools, to_query, values)
 
     return {'results': values.dump()}
 

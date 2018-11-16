@@ -7,7 +7,7 @@ moduleinfo = {'version': '0.1',
               'module-type': ['expansion']}
 moduleconfig = ['api_id', 'apikey']
 misperrors = {'error': 'Error'}
-misp_types_in = ['domain', 'email-attachment', 'email-dst', 'email-reply-to', 'email-src', 'email-subject',
+misp_types_in = ['domain', 'domain|ip', 'email-attachment', 'email-dst', 'email-reply-to', 'email-src', 'email-subject',
                  'filename', 'hostname', 'ip-src', 'ip-dst', 'md5', 'mutex', 'regkey', 'sha1', 'sha256', 'uri', 'url',
                  'user-agent', 'whois-registrant-email', 'x509-fingerprint-md5']
 mapping_out = {  # mapping between the MISP attributes types and the compatible CrowdStrike indicator types.
@@ -51,9 +51,12 @@ def handler(q=False):
     valid_type = False
     for k in misp_types_in:
         if request.get(k):
-            # map the MISP typ to the CrowdStrike type
-            for item in lookup_indicator(client, request[k]):
-                r['results'].append(item)
+            to_query = request[k]
+            if '|' in k:
+                to_query, query = to_query.split('|')
+                r['result'].extend([ item for item in lookup_indicator(client, query)])
+            # map the MISP type to the CrowdStrike type
+            r['results'].extend([item for item in lookup_indicator(client, to_query)])
             valid_type = True
 
     if not valid_type:

@@ -4,7 +4,7 @@ import json
 from pyeupi import PyEUPI
 
 misperrors = {'error': 'Error'}
-mispattributes = {'input': ['hostname', 'domain', 'url'], 'output': ['freetext']}
+mispattributes = {'input': ['hostname', 'hostname|port', 'domain', 'domain|ip', 'url'], 'output': ['freetext']}
 moduleinfo = {'version': '0.1', 'author': 'Raphaël Vinot',
               'description': 'Query the Phishing Initiative service (https://phishing-initiative.lu)',
               'module-type': ['expansion', 'hover']}
@@ -18,8 +18,12 @@ def handler(q=False):
     request = json.loads(q)
     if request.get('hostname'):
         toquery = request['hostname']
+    elif request.get('hostname|port'):
+        toquery, _ = request['hostname|port'].split('|')
     elif request.get('domain'):
         toquery = request['domain']
+    elif request.get('domain|ip'):
+        toquery, _ = request['domain|ip'].split('|')
     elif request.get('url'):
         toquery = request['url']
     else:

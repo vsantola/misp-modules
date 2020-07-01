@@ -37,6 +37,7 @@ moduleconfig = [
 mispattributes = {
     "input": ["attachment", "malware-sample", "url", "domain"],
     "output": ["link"],
+    "format": "misp_standard"
 }
 
 
@@ -78,12 +79,16 @@ def handler(q=False):
             log.info("Submitting URL: %s", url)
             result = joe.submit_url(url, params=params)
         else:
-            if "malware-sample" in request:
-                filename = request.get("malware-sample").split("|", 1)[0]
-                data = _decode_malware(request["data"], True)
-            elif "attachment" in request:
-                filename = request["attachment"]
-                data = _decode_malware(request["data"], False)
+            attr_type = request['attribute']['type']
+            attr_value = request['attribute']['value']
+            attr_data = request['attribute']['data']
+
+            if attr_type == "malware-sample":
+                filename = attr_value.split("|", 1)[0]
+                data = _decode_malware(attr_data, True)
+            elif attr_type == "attachment":
+                filename = attr_value
+                data = _decode_malware(attr_data, False)
 
             data_fp = io.BytesIO(data)
             log.info("Submitting sample: %s", filename)

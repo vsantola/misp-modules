@@ -8,6 +8,7 @@ import zipfile
 import re
 
 from urllib.parse import urljoin
+from pymisp import MISPAttribute, MISPEvent
 
 
 log = logging.getLogger(__name__)
@@ -32,6 +33,11 @@ moduleconfig = [
     "accept-tac",
     "report-cache",
     "systems",
+    "secondary-results",
+    "localized-internet-country",
+    "ssl-inspection",
+    "analysis-time",
+    "tags"
 ]
 
 mispattributes = {
@@ -54,15 +60,30 @@ def handler(q=False):
     systems = request["config"].get("systems") or ""
     systems = [s.strip() for s in re.split(r"[\s,;]", systems) if s.strip()]
 
+    # tags
+    tags = request["config"].get("tags") or ""
+    tags = [s.strip() for s in re.split(r"[\s,;]", tags) if s.strip()]
+
+    # others
+    lia = request["config"].get("localized-internet-country") or ""
+    analysis_time = request["config"].get("analysis-time") or 120
+
     try:
         accept_tac = _parse_bool(request["config"].get("accept-tac"), "accept-tac")
         report_cache = _parse_bool(request["config"].get("report-cache"), "report-cache")
+        secondary_results = _parse_bool(request["config"].get("secondary-results"), "secondary-results")
+        ssl_inspection = _parse_bool(request["config"].get("ssl-inspection"), "ssl-inspection")
     except _ParseError as e:
         return {"error": str(e)}
 
     params = {
         "report-cache": report_cache,
         "systems": systems,
+        "secondary-results": secondary_results,
+        "localized-internet-country": lia,
+        "ssl-inspection": ssl_inspection,
+        "analysis-time": analysis_time,
+        "tags": tags
     }
 
     if not apikey:
@@ -96,17 +117,20 @@ def handler(q=False):
 
         assert "submission_id" in result
     except jbxapi.JoeException as e:
+        log.error("ERROR: %s" % str(e))
         return {"error": str(e)}
 
     link_to_analysis = urljoin(apiurl, "../submissions/{}".format(result["submission_id"]))
 
-    return {
-        "results": [{
-            "types": "link",
-            "categories": "External analysis",
-            "values": link_to_analysis,
-        }]
-    }
+    attribute = MISPAttribute()
+    attribute.from_dict(**{'type': 'link', 'value': link_to_analysis, 'to_ids': False})
+    misp_event = MISPEvent()
+    misp_event.add_attribute(**attribute)
+    event = json.loads(misp_event.to_json())
+    results = {key: event[key] for key in ('Attribute', 'Object', 'Tag') if (key in event and event[key])}
+    log.debug(results)
+    return {'results': results} 
+    
 
 
 def introspection():

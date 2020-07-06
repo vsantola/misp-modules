@@ -49,6 +49,11 @@ regkey_object_mapping = {'name': ('text', 'name'), 'newdata': ('text', 'data'),
 signerinfo_object_mapping = {'sigissuer': ('text', 'issuer'),
                              'version': ('text', 'version')}
 
+threatname_mapping = {'Agent Tesla': ['AgentTesla'],
+                      'Dridex': ['Dridex Dropper'],
+                      'MASS Logger': ['MassLogger RAT']
+                     }
+
 
 class JoeParser():
     def __init__(self, config):
@@ -72,6 +77,7 @@ class JoeParser():
         self.parse_screenshot()
         self.parse_network_interactions()
         self.parse_dropped_files()
+        self.parse_threatname()
 
         if self.attributes:
             self.handle_attributes()
@@ -400,6 +406,21 @@ class JoeParser():
                     self.misp_event.add_object(**registry_key)
                     self.references[process_uuid].append(dict(referenced_uuid=registry_key.uuid,
                                                               relationship_type=relationship))
+
+    def parse_threatname(self):
+        sigdetections = self.data['signaturedetections']
+        if sigdetections:
+            threatname = sigdetections['strategy'][1]['threatname']
+            threatname_malpedia = threatname
+            if threatname and threatname != "Unknown":
+                for k,v in threatname_mapping.items():
+                    for i in v:
+                        if threatname==i or threatname==i.lower():
+                            threatname_malpedia=k
+
+                self.misp_event.add_tag('mwdb:family="{}"'.format(threatname.lower()))
+                self.misp_event.add_tag('misp-galaxy:malpedia="{}"'.format(threatname_malpedia))
+
 
     def add_process_reference(self, target, currentpath, reference):
         try:

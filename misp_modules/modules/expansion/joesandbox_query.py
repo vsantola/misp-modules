@@ -51,7 +51,7 @@ def handler(q=False):
     joe_data = json.loads(joe.analysis_download(analysis_webid, 'jsonfixed')[1])
     joe_parser.parse_data(joe_data['analysis'])
     joe_parser.finalize_results()
-
+    print("results: %s" % joe_parser.results)
     return {'results': joe_parser.results}
 
 

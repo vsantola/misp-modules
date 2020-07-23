@@ -78,6 +78,7 @@ class JoeParser():
         self.parse_network_interactions()
         self.parse_dropped_files()
         self.parse_threatname()
+        self.parse_malwareconfig()
 
         if self.attributes:
             self.handle_attributes()
@@ -420,6 +421,18 @@ class JoeParser():
 
                 self.misp_event.add_tag('mwdb:family="{}"'.format(threatname.lower()))
                 self.misp_event.add_tag('misp-galaxy:malpedia="{}"'.format(threatname_malpedia))
+
+    
+    def parse_malwareconfig(self):
+        malwareconfigs = self.data['malwareconfigs']
+        for mw in malwareconfigs['config']:
+            for threat,config in mw.items():
+                attribute = MISPAttribute()
+                attribute_dict = {'type': 'other', 'category': 'payload-installation', 'value': config, 'to_ids': False}
+                attribute_dict['comment'] = "Config extracted for %s malware - Enriched via the joe_import module" % threat
+                attribute.from_dict(**attribute_dict)
+                self.misp_event.add_attribute(**attribute)
+
 
 
     def add_process_reference(self, target, currentpath, reference):

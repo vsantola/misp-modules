@@ -1,8 +1,9 @@
 # -*- coding: utf-8 -*-
+import json
 from collections import defaultdict
 from datetime import datetime
 from pymisp import MISPAttribute, MISPEvent, MISPObject
-import json
+from joe_parser_config import threatname_mapping, ignore_filenames_exact, ignore_filenames_prefix, ignore_regkeys
 
 
 arch_type_mapping = {'ANDROID': 'parse_apk', 'LINUX': 'parse_elf', 'WINDOWS': 'parse_pe'}
@@ -51,7 +52,8 @@ signerinfo_object_mapping = {'sigissuer': ('text', 'issuer'),
 
 threatname_mapping = {'Agent Tesla': ['AgentTesla'],
                       'Dridex': ['Dridex Dropper'],
-                      'MASS Logger': ['MassLogger RAT']
+                      'MASS Logger': ['MassLogger RAT'],
+                      'Ave Maria': ['AveMaria']
                      }
 
 
@@ -64,6 +66,9 @@ class JoeParser():
 
         self.import_pe = config["import_pe"]
         self.create_mitre_attack = config["mitre_attack"]
+        self.import_malware_config = config["import_malware_config"]
+        self.import_network_interactions = config["import_network_interactions"]
+        self.import_dropped_files = config["import_dropped_files"]
 
     def parse_data(self, data):
         self.data = data
@@ -75,10 +80,16 @@ class JoeParser():
         self.parse_system_behavior()
         self.parse_network_behavior()
         self.parse_screenshot()
-        self.parse_network_interactions()
-        self.parse_dropped_files()
         self.parse_threatname()
-        self.parse_malwareconfig()
+
+        if self.import_dropped_files:
+            self.parse_dropped_files()
+
+        if self.import_network_interactions:
+            self.parse_network_interactions()
+        
+        if self.import_malware_config:
+            self.parse_malwareconfig()
 
         if self.attributes:
             self.handle_attributes()
@@ -135,8 +146,12 @@ class JoeParser():
         for protocol, layer in protocols.items():
             if network.get(protocol):
                 for packet in network[protocol]['packet']:
-                    timestamp = datetime.strptime(self.parse_timestamp(packet['timestamp']), '%b %d, %Y %H:%M:%S.%f')
-                    connections[tuple(packet[field] for field in network_behavior_fields)][protocol].add(timestamp)
+                    try:
+                        timestamp = datetime.strptime(self.parse_timestamp(packet['timestamp']), '%b %d, %Y %H:%M:%S.%f')
+                        connections[tuple(packet[field] for field in network_behavior_fields)][protocol].add(timestamp)
+                    except Exception as e:
+                        print("Error: %s" % str(e))
+
         for connection, data in connections.items():
             attributes = self.prefetch_attributes_data(connection)
             if len(data.keys()) == len(set(protocols[protocol] for protocol in data.keys())):
@@ -201,7 +216,8 @@ class JoeParser():
 
             if files:
                 for call in files['call']:
-                    self.attributes['filename'][call['path']].add((process_uuid, file_references_mapping[feature]))
+                    if not (call['path'] in ignore_filenames_exact and any(prefix in call['path'] for prefix in ignore_filenames_prefix)):
+                        self.attributes['filename'][call['path']].add((process_uuid, file_references_mapping[feature]))
 
     def analysis_type(self):
         generalinfo = self.data['generalinfo']
@@ -425,13 +441,18 @@ class JoeParser():
     
     def parse_malwareconfig(self):
         malwareconfigs = self.data['malwareconfigs']
-        for mw in malwareconfigs['config']:
-            for threat,config in mw.items():
-                attribute = MISPAttribute()
-                attribute_dict = {'type': 'other', 'category': 'payload-installation', 'value': config, 'to_ids': False}
-                attribute_dict['comment'] = "Config extracted for %s malware - Enriched via the joe_import module" % threat
-                attribute.from_dict(**attribute_dict)
-                self.misp_event.add_attribute(**attribute)
+        if malwareconfigs:
+            print("malwareconfigs with %s" % malwareconfigs)
+            for mw in malwareconfigs['config']:
+                for threat,config in mw.items():
+                    print("threat: %s - config: %s" % (threat, config))
+                    attribute = MISPAttribute()
+                    attribute_dict = {'type': 'other', 'value': config, 'to_ids': False}
+                    attribute_dict['comment'] = "Config extracted for %s malware - Enriched via the joe_import module" % threat
+                    attribute.from_dict(**attribute_dict)
+                    self.misp_event.add_attribute(**attribute)
+        else:
+            print("No malware config to process")
 
 
 

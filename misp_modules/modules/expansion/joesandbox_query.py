@@ -10,7 +10,7 @@ inputSource = ['link']
 moduleinfo = {'version': '0.2', 'author': 'Christian Studer',
               'description': 'Query Joe Sandbox API with a report URL to get the parsed data.',
               'module-type': ['expansion']}
-moduleconfig = ['apiurl', 'apikey', 'import_pe', 'import_mitre_attack']
+moduleconfig = ['apiurl', 'apikey', 'import_pe', 'import_mitre_attack', 'import_network_interactions', 'import_malware_config', 'import_dropped_files']
 
 
 def handler(q=False):
@@ -22,6 +22,9 @@ def handler(q=False):
     parser_config = {
         "import_pe": request["config"].get('import_pe', "false") == "true",
         "mitre_attack": request["config"].get('import_mitre_attack', "false") == "true",
+        "import_network_interactions": request["config"].get('import_mitre_attack', "false") == "true",
+        "import_malware_config": request["config"].get('import_malware_config', "false") == "true",
+        "import_dropped_files": request["config"].get('import_dropped_files', "false") == "true",
     }
 
     if not apikey:
@@ -51,7 +54,7 @@ def handler(q=False):
     joe_data = json.loads(joe.analysis_download(analysis_webid, 'jsonfixed')[1])
     joe_parser.parse_data(joe_data['analysis'])
     joe_parser.finalize_results()
-    print("results: %s" % joe_parser.results)
+    # print("results: %s" % joe_parser.results)
     return {'results': joe_parser.results}
 
 

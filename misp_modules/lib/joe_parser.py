@@ -3,7 +3,7 @@ import json
 from collections import defaultdict
 from datetime import datetime
 from pymisp import MISPAttribute, MISPEvent, MISPObject
-from joe_parser_config import threatname_mapping, ignore_filenames_exact, ignore_filenames_prefix, ignore_regkeys
+from joe_parser_config import threatname_mapping, ignore_filenames_exact, ignore_filenames_substr, ignore_regkeys
 
 
 arch_type_mapping = {'ANDROID': 'parse_apk', 'LINUX': 'parse_elf', 'WINDOWS': 'parse_pe'}
@@ -50,12 +50,6 @@ regkey_object_mapping = {'name': ('text', 'name'), 'newdata': ('text', 'data'),
 signerinfo_object_mapping = {'sigissuer': ('text', 'issuer'),
                              'version': ('text', 'version')}
 
-threatname_mapping = {'Agent Tesla': ['AgentTesla'],
-                      'Dridex': ['Dridex Dropper'],
-                      'MASS Logger': ['MassLogger RAT'],
-                      'Ave Maria': ['AveMaria']
-                     }
-
 
 class JoeParser():
     def __init__(self, config):
@@ -69,6 +63,7 @@ class JoeParser():
         self.import_malware_config = config["import_malware_config"]
         self.import_network_interactions = config["import_network_interactions"]
         self.import_dropped_files = config["import_dropped_files"]
+        self.import_registry_activities = config["import_registry_activities"]
 
     def parse_data(self, data):
         self.data = data
@@ -216,7 +211,7 @@ class JoeParser():
 
             if files:
                 for call in files['call']:
-                    if not (call['path'] in ignore_filenames_exact and any(prefix in call['path'] for prefix in ignore_filenames_prefix)):
+                    if not (call['path'] in ignore_filenames_exact and any(filename_substr in call['path'] for filename_substring.lower() in (s.lower() for s in ignore_filenames_prefix)):
                         self.attributes['filename'][call['path']].add((process_uuid, file_references_mapping[feature]))
 
     def analysis_type(self):
@@ -409,6 +404,9 @@ class JoeParser():
                 self.misp_event.add_attribute(**attribute)
 
     def parse_registryactivities(self, process_uuid, registryactivities):
+        if not self.import_registry_activities:
+            return
+
         if registryactivities['keyCreated']:
             for call in registryactivities['keyCreated']['call']:
                 self.attributes['regkey'][call['path']].add((process_uuid, 'creates'))

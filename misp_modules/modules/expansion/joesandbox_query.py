@@ -10,7 +10,15 @@ inputSource = ['link']
 moduleinfo = {'version': '0.2', 'author': 'Christian Studer',
               'description': 'Query Joe Sandbox API with a report URL to get the parsed data.',
               'module-type': ['expansion']}
-moduleconfig = ['apiurl', 'apikey', 'import_pe', 'import_mitre_attack', 'import_network_interactions', 'import_malware_config', 'import_dropped_files']
+moduleconfig = ['apiurl', 
+                'apikey', 
+                'import_pe', 
+                'import_mitre_attack', 
+                'import_network_interactions', 
+                'import_malware_config', 
+                'import_dropped_files',
+                'import_registry_activities'
+                ]
 
 
 def handler(q=False):
@@ -25,6 +33,7 @@ def handler(q=False):
         "import_network_interactions": request["config"].get('import_mitre_attack', "false") == "true",
         "import_malware_config": request["config"].get('import_malware_config', "false") == "true",
         "import_dropped_files": request["config"].get('import_dropped_files', "false") == "true",
+        "import_registry_activities": request["config"].get('import_registry_activities', "false") == "true",
     }
 
     if not apikey:

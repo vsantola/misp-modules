@@ -32,7 +32,7 @@ def handler(q=False):
     parser_config = {
         "import_pe": request["config"].get('import_pe', "false") == "true",
         "mitre_attack": request["config"].get('import_mitre_attack', "false") == "true",
-        "import_network_interactions": request["config"].get('import_mitre_attack', "false") == "true",
+        "import_network_interactions": request["config"].get('import_network_interactions', "false") == "true",
         "import_malware_config": request["config"].get('import_malware_config', "false") == "true",
         "import_dropped_files": request["config"].get('import_dropped_files', "false") == "true",
         "import_registry_activities": request["config"].get('import_registry_activities', "false") == "true",

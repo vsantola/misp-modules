@@ -14,6 +14,8 @@ moduleconfig = ['apiurl',
                 'apikey', 
                 'import_pe', 
                 'import_mitre_attack', 
+                'import_system_behavior',
+                'import_network_behavior',
                 'import_network_interactions', 
                 'import_malware_config', 
                 'import_dropped_files',
@@ -34,6 +36,8 @@ def handler(q=False):
         "import_malware_config": request["config"].get('import_malware_config', "false") == "true",
         "import_dropped_files": request["config"].get('import_dropped_files', "false") == "true",
         "import_registry_activities": request["config"].get('import_registry_activities', "false") == "true",
+        "import_system_behavior": request["config"].get('import_system_behavior', "false") == "true",
+        "import_network_behavior": request["config"].get('import_network_behavior', "false") == "true",
     }
 
     if not apikey:

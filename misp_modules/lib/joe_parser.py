@@ -64,6 +64,8 @@ class JoeParser():
         self.import_network_interactions = config["import_network_interactions"]
         self.import_dropped_files = config["import_dropped_files"]
         self.import_registry_activities = config["import_registry_activities"]
+        self.import_system_behavior = config["import_system_behavior"]
+        self.import_network_behavior = config["import_network_behavior"]
 
     def parse_data(self, data):
         self.data = data
@@ -72,10 +74,14 @@ class JoeParser():
         else:
             self.parse_url_analysis()
 
-        self.parse_system_behavior()
-        self.parse_network_behavior()
         self.parse_screenshot()
         self.parse_threatname()
+
+        if self.import_system_behavior:
+            self.parse_system_behavior()
+        
+        if self.import_network_behavior:
+            self.parse_network_behavior()
 
         if self.import_dropped_files:
             self.parse_dropped_files()
@@ -211,7 +217,7 @@ class JoeParser():
 
             if files:
                 for call in files['call']:
-                    if not (call['path'] in ignore_filenames_exact and any(filename_substr in call['path'] for filename_substring.lower() in (s.lower() for s in ignore_filenames_prefix)):
+                    if not (call['path'] in ignore_filenames_exact and call['path'].lower() in (s.lower() for s in ignore_filenames_substr)):
                         self.attributes['filename'][call['path']].add((process_uuid, file_references_mapping[feature]))
 
     def analysis_type(self):

@@ -76,6 +76,15 @@ def handler(q=False):
     except _ParseError as e:
         return {"error": str(e)}
 
+    comments = {
+        "source": "misp",
+        "event_id": request["event_id"],
+        "attribute_id": request["attribute"]["id"],
+        "attribute_uuid": request["attribute"]["uuid"],
+        "attribute_type": request["attribute"]["type"],
+        "attribute_category": request["attribute"]["category"]
+    }
+
     params = {
         "report-cache": report_cache,
         "systems": systems,
@@ -83,6 +92,7 @@ def handler(q=False):
         "localized-internet-country": lia,
         "ssl-inspection": ssl_inspection,
         "analysis-time": analysis_time,
+        "comments": json.dumps(comments),
         "tags": tags
     }
 

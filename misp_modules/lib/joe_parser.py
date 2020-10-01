@@ -1,9 +1,12 @@
 # -*- coding: utf-8 -*-
+import sys
 import json
+import ipaddress
+import logging
 from collections import defaultdict
 from datetime import datetime
 from pymisp import MISPAttribute, MISPEvent, MISPObject
-from joe_parser_config import threatname_mapping, ignore_filenames_exact, ignore_filenames_substr, ignore_regkeys
+from joe_parser_config import threatname_mapping, ignore_filenames_exact, ignore_filenames_substr, ignore_regkeys, ignore_ipaddr, ignore_url, disable_correlations
 
 
 arch_type_mapping = {'ANDROID': 'parse_apk', 'LINUX': 'parse_elf', 'WINDOWS': 'parse_pe'}
@@ -53,6 +56,16 @@ signerinfo_object_mapping = {'sigissuer': ('text', 'issuer'),
 
 class JoeParser():
     def __init__(self, config):
+        self.log = logging.getLogger(__name__)
+        self.log.setLevel(logging.DEBUG)
+        sh = logging.StreamHandler(sys.stdout)
+        sh.setLevel(logging.DEBUG)
+        fmt = logging.Formatter(
+            "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+        )
+        sh.setFormatter(fmt)
+        self.log.addHandler(sh)
+
         self.misp_event = MISPEvent()
         self.references = defaultdict(list)
         self.attributes = defaultdict(lambda: defaultdict(set))
@@ -141,6 +154,21 @@ class JoeParser():
                     for technique in tactic['technique']:
                         self.misp_event.add_tag('misp-galaxy:mitre-attack-pattern="{} - {}"'.format(technique['name'], technique['id']))
 
+
+    def check_ignore_ipaddr(self, ip):
+        ignore = False
+        for ignore_ip in ignore_ipaddr:
+            if "/" in ignore_ip:
+                if ipaddress.ip_address(ip) in ipaddress.ip_network(ignore_ip):
+                    ignore = True
+                    break
+            else:
+                if ipaddress.ip_address(ip) == ipaddress.ip_address(ignore_ip):
+                    ignore = True
+                    break
+        return ignore
+
+
     def parse_network_behavior(self):
         network = self.data['behavior']['network']
         connections = defaultdict(lambda: defaultdict(set))
@@ -148,8 +176,9 @@ class JoeParser():
             if network.get(protocol):
                 for packet in network[protocol]['packet']:
                     try:
-                        timestamp = datetime.strptime(self.parse_timestamp(packet['timestamp']), '%b %d, %Y %H:%M:%S.%f')
-                        connections[tuple(packet[field] for field in network_behavior_fields)][protocol].add(timestamp)
+                        if not (self.check_ignore_ipaddr(packet['srcip']) or self.check_ignore_ipaddr(packet['dstip'])):
+                            timestamp = datetime.strptime(self.parse_timestamp(packet['timestamp']), '%b %d, %Y %H:%M:%S.%f')
+                            connections[tuple(packet[field] for field in network_behavior_fields)][protocol].add(timestamp)
                     except Exception as e:
                         print("Error: %s" % str(e))
 
@@ -195,12 +224,16 @@ class JoeParser():
             process_activities = {'fileactivities': self.parse_fileactivities,
                                   'registryactivities': self.parse_registryactivities}
             for process in system['processes']['process']:
+                no_correlation = False
                 general = process['general']
+                if general['name'] in disable_correlations:
+                    no_correlation = True
+
                 process_object = MISPObject('process')
                 for feature, relation in process_object_fields.items():
-                    process_object.add_attribute(relation, **{'type': 'text', 'value': general[feature], 'to_ids': False})
+                    process_object.add_attribute(relation, **{'type': 'text', 'value': general[feature], 'disable_correlation': no_correlation, 'to_ids': False})
                 start_time = datetime.strptime('{} {}'.format(general['date'], general['time']), '%d/%m/%Y %H:%M:%S')
-                process_object.add_attribute('start-time', **{'type': 'datetime', 'value': start_time, 'to_ids': False})
+                process_object.add_attribute('start-time', **{'type': 'datetime', 'value': start_time, 'disable_correlation': no_correlation, 'to_ids': False})
                 self.misp_event.add_object(**process_object)
                 for field, to_call in process_activities.items():
                     if process.get(field):
@@ -208,6 +241,22 @@ class JoeParser():
                 self.references[self.analysisinfo_uuid].append(dict(referenced_uuid=process_object.uuid,
                                                                     relationship_type='calls'))
                 self.process_references[(general['targetid'], general['path'])] = process_object.uuid
+
+    def check_ignore_filenames(self, path):
+        ignore = False
+        for s in ignore_filenames_exact:
+            if s.lower() == path.lower():
+                ignore = True
+                break
+
+        if not ignore:
+            for s in ignore_filenames_substr:
+                if s.lower() in path.lower():
+                    ignore = True
+                    break
+
+        return ignore
+
 
     def parse_fileactivities(self, process_uuid, fileactivities):
         for feature, files in fileactivities.items():
@@ -217,8 +266,9 @@ class JoeParser():
 
             if files:
                 for call in files['call']:
-                    if not (call['path'] in ignore_filenames_exact and call['path'].lower() in (s.lower() for s in ignore_filenames_substr)):
+                    if not self.check_ignore_filenames(call['path']):
                         self.attributes['filename'][call['path']].add((process_uuid, file_references_mapping[feature]))
+
 
     def analysis_type(self):
         generalinfo = self.data['generalinfo']
@@ -244,7 +294,7 @@ class JoeParser():
 
         file_object = MISPObject('file')
         self.analysisinfo_uuid = file_object.uuid
-
+        
         for field in file_object_fields:
             file_object.add_attribute(field, **{'type': field, 'value': fileinfo[field], 'to_ids': False})
         for field, mapping in file_object_mapping.items():
@@ -384,17 +434,22 @@ class JoeParser():
                     self.misp_event.add_attribute(**attribute)
                     reference = dict(referenced_uuid=attribute.uuid, relationship_type='contacts')
                     self.add_process_reference(domain['@targetid'], domain['@currentpath'], reference)
+
         ipinfo = self.data['ipinfo']
         if ipinfo:
             for ip in ipinfo['ip']:
-                attribute = MISPAttribute()
-                attribute.from_dict(**{'type': 'ip-dst', 'value': ip['@ip'], 'to_ids': False})
-                self.misp_event.add_attribute(**attribute)
-                reference = dict(referenced_uuid=attribute.uuid, relationship_type='contacts')
-                self.add_process_reference(ip['@targetid'], ip['@currentpath'], reference)
+                if not self.check_ignore_ipaddr(ip['@ip']):
+                    attribute = MISPAttribute()
+                    attribute.from_dict(**{'type': 'ip-dst', 'value': ip['@ip'], 'to_ids': False})
+                    self.misp_event.add_attribute(**attribute)
+                    reference = dict(referenced_uuid=attribute.uuid, relationship_type='contacts')
+                    self.add_process_reference(ip['@targetid'], ip['@currentpath'], reference)
+
         urlinfo = self.data['urlinfo']
         if urlinfo:
             for url in urlinfo['url']:
+                if url['@name'] in ignore_url:
+                    continue
                 target_id = int(url['@targetid'])
                 current_path = url['@currentpath']
                 attribute = MISPAttribute()

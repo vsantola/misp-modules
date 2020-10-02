@@ -3,10 +3,12 @@ import sys
 import json
 import ipaddress
 import logging
+import validators
 from collections import defaultdict
 from datetime import datetime
+from urlparse import urlparse
 from pymisp import MISPAttribute, MISPEvent, MISPObject
-from joe_parser_config import threatname_mapping, ignore_filenames_exact, ignore_filenames_substr, ignore_regkeys, ignore_ipaddr, ignore_url, disable_correlations
+from joe_parser_config import *
 
 
 arch_type_mapping = {'ANDROID': 'parse_apk', 'LINUX': 'parse_elf', 'WINDOWS': 'parse_pe'}
@@ -510,9 +512,91 @@ class JoeParser():
                     attribute_dict['comment'] = "Config extracted for %s malware - Enriched via the joe_import module" % threat
                     attribute.from_dict(**attribute_dict)
                     self.misp_event.add_attribute(**attribute)
+
+                    # parses domains and ipaddrs
+                    try:
+                        if threat.lower() in configs_keys_c2:
+                            c2attr = list()
+                            c2conf = configs_keys_c2[threat.lower()]
+                            c2field = None
+                            for f in config:
+                                if c2conf['c2key'] in f:
+                                    c2field = config[f]
+                                    break
+
+                            if c2field:
+                                
+                                # ip, ipport, domain, domaincsv, domainport, url,
+                                if c2conf['c2type'] == "ip":
+                                    if isinstance(c2field, list):
+                                        for c2 in c2field:
+                                            c2attr.append({'c2': c2, 'port': c2conf['defaultport'], 'type': 'ip'})
+                                    else:
+                                        c2attr.append({'c2': c2field, 'port': c2conf['defaultport'], 'type': 'ip'})
+
+                                elif c2conf['c2type'] == "ipport":
+                                    if isinstance(c2field, list):
+                                        for c2 in c2field:
+                                            ip,port = c2.split(":")
+                                            c2attr.append({'c2': ip, 'port': port, 'type': 'ip'})
+                                    else:
+                                        ip,port = c2field.split(":")
+                                        c2attr.append({'c2': ip, 'port': port, 'type': 'ip'})
+
+                                elif c2conf['c2type'] == "domain":
+                                    if isinstance(c2field, list):
+                                        for c2 in c2field:
+                                            c2attr.append({'c2': c2, 'port': c2conf['defaultport'], 'type': 'domain'})
+                                    else:
+                                        c2attr.append({'c2': c2field, 'port': c2conf['defaultport'], 'type': 'domain'})
+
+                                elif c2conf['c2type'] == "domaincsv":
+                                    domains = c2field.split(";")
+                                    for d in domains:
+                                        c2attr.append({'c2': d, 'port': c2conf['defaultport'], 'type': 'domain'})
+
+                                elif c2conf['c2type'] == "domainport":
+                                    if isinstance(c2field, list):
+                                        for c2 in c2field:
+                                            domain,port = c2.split(":")
+                                            c2attr.append({'c2': domain, 'port': port, 'type': 'domain'})
+                                    else:
+                                        domain,port = c2field.split(":")
+                                        c2attr.append({'c2': domain, 'port': port, 'type': 'domain'})
+
+                                elif c2conf['c2type'] == "url":
+                                    if isinstance(c2field, list):
+                                        for c2 in c2field:
+                                            c2attr.append(self.parse_c2_url(c2))
+
+                                    else:
+                                        c2attr.append(self.parse_c2_url(c2field))
+                            
+                            else:
+                                self.log.debug("No C2 field found in %s config" % threat)
+
+                    except Exception as e:
+                        self.log.error("Couldn't parse C2 info from %s config: %s" % (threat, str(e)))
+                        
         else:
             print("No malware config to process")
 
+
+    def parse_c2_url(self, c2):
+        url = urlparse(c2)
+        netloc = url.netloc.split(":")
+        if len(netloc) > 1:
+            port = netloc[1]
+        else:
+            if url.schema == 'https':
+                port = 443
+            else:
+                port = 80
+
+        if ipv4(netloc[0]):
+            return {'c2': netloc[0], 'port': port, 'type': 'ip'}
+        else:
+            return {'c2': netloc[0], 'port': port, 'type': 'domain'}
 
 
     def add_process_reference(self, target, currentpath, reference):

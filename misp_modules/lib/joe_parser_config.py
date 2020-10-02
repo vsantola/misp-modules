@@ -142,3 +142,26 @@ disable_correlations = [
         "powershell.exe",
         "WINWORD.EXE",
 ]
+
+# configs keys that have ipaddr C2 info
+configs_keys_c2 = {
+        'nanocore': {'c2key:': "C2", 'c2type': "ip", 'defaultport': 4455},
+        'adwind': {'c2key:': "NETWORK", 'c2type': "ip", 'defaultport': 80},
+        'sodinokibi': {'c2key:': "dmn", 'c2type': "domain_csv", 'defaultport': 443},
+        'trickbot': {'c2key:': "C2 list", 'c2type': "ipport", 'defaultport': 443},
+        'emotet': {'c2key': "C2 list", 'c2type': "ipport", 'defaultport': None},
+        'hawkeye': {'c2key': None, 'c2type': None, 'defaultport': None},
+        'agenttesla': {'c2key': "URL", 'c2type': "url", 'defaultport': 443},
+        'lokibot': {'c2key': "c2", 'c2type': "domain", 'defaultport': 443},
+        'racoon': {'c2key': None, 'c2type': None, 'defaultport': None},
+        'nanocore': {'c2key': "C2", 'c2type': "ip", 'defaultport': 2017},
+        'predator': {'c2key': "c2", 'c2type': "url", 'defaultport': 80},
+        'azorult': {'c2key': None, 'c2type': None, 'defaultport': None},
+        'darkcomet': {'c2key': "NETDATA", 'c2type': 'domainport', 'defaultport': 1604},
+        'amadey': {'c2key': None, 'c2type': None, 'defaultport': None},
+        'qbot': {'c2key': None, 'c2type': None, 'defaultport': None},
+        'diamondfox': {'c2key': None, 'c2type': None, 'defaultport': None},
+        'xmrig': {'c2key': None, 'c2type': None, 'defaultport': None},
+        'ursnif': {'c2key': None, 'c2type': None, 'defaultport': None},
+        'bazarbackdoor': {'c2key': 'c2s', 'c2type': 'ip', 'defaultport': 443},
+}

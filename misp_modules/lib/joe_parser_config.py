@@ -2,6 +2,9 @@
 # This file holds threat mappings and ignore lists for misp-modules joe_parser
 # 
 
+# tags to add to attributes parsed from malware configs
+attribute_tags = ['bitsight:ioc-confidence=high', 'bitsight:ioc-source=malware-config']
+
 # threat name mapping between malpedia and joe sandbox
 # dict("MALPEDIA_THREATNAME": ['JOE_THREATNAME', 'JOE_TRHEATNAME'])
 
@@ -62,7 +65,8 @@ ignore_filenames_exact = [
         "c:\\users\\user\\appdata\\roaming\\microsoft\\windows\\cookies",
         "c:\\users\\user\\appdata\\roaming",
         "c:\\users\\user\\appdata\\local",
-
+        "c:\\users\\user\\appdata",
+        "c:\\users\\user\\Microsoft\\Windows\\IECompatUACache"
         ]
 
 # All files with those substrings will be ignored
@@ -114,7 +118,9 @@ ignore_filenames_substr = [
         "\\VBE",
         "\\Microsoft\\Crypto",
         "\\assembly\\NativeImages",
-        "\\Microsoft.NET\\Framework"
+        "\\Microsoft.NET\\Framework",
+        "\\Adobe\\Color",
+        "\\ow",
         "unknown"
 ]
 
